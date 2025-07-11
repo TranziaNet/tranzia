@@ -25,6 +25,6 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
-            -t ghcr.io/TranziaNet/tranzia:${{ steps.tag.outputs.tag_name }} \
-            -t ghcr.io/TranziaNet/tranzia:latest \
+            -t ghcr.io/tranzianet/tranzia:${{ steps.tag.outputs.tag_name }} \
+            -t ghcr.io/tranzianet/tranzia:latest \
             .
