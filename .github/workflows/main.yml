@@ -28,3 +28,8 @@ jobs:
             -t ghcr.io/tranzianet/tranzia:${{ steps.tag.outputs.tag_name }} \
             -t ghcr.io/tranzianet/tranzia:latest \
             .
+
+      - name: Push Docker image
+        run: |
+          docker push ghcr.io/tranzianet/tranzia:${{ steps.tag.outputs.tag_name }}
+          docker push ghcr.io/tranzianet/tranzia:latest
