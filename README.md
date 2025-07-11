@@ -50,3 +50,21 @@ git clone https://github.com/TranziaNet/tranzia.git
 cd tranzia
 make build
 ```
+
+### Use latest docker image
+
+```bash
+docker pull ghcr.io/tranzianet/tranzia:latest
+```
+
+## 🔧 Usage
+
+### Using docker
+
+```bash
+docker run --rm ghcr.io/tranzianet/tranzia:latest --help
+
+OR
+
+docker run --rm ghcr.io/tranzianet/tranzia:latest echo-server
+```

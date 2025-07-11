@@ -11,7 +11,7 @@ import (
 )
 
 var rootCmd = cobra.Command{
-	Use: "tanzia",
+	Use: "tranzia",
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: implement necessary function
 		fmt.Println("Hello world!")
