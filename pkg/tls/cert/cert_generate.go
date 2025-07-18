@@ -7,16 +7,21 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"math/big"
+	"os"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
 
 type CertGenerateOptions struct {
 	bits            int
-	cn              string
+	subject         *sub
 	keyType         string
 	dns             string
 	ip              string
@@ -24,21 +29,24 @@ type CertGenerateOptions struct {
 	caKeyFilePath   string
 	outCertFilePath string
 	outKeyFilePath  string
-	validity        string
+	validity        int
 	sanEmail        string
 	usage           string
 	isCA            bool
 	pathLength      int
 }
-
-type CertOptions struct {
-	publicKey  []byte
-	privateKey []byte
+type sub struct {
+	c  []string
+	o  []string
+	ou []string
+	l  []string
+	cn string
+	st []string
 }
 
 var (
 	bits            int
-	cn              string
+	subject         string
 	keyType         string
 	dns             string
 	ip              string
@@ -46,7 +54,7 @@ var (
 	caKeyFilePath   string
 	outCertFilePath string
 	outKeyFilePath  string
-	validity        string
+	validity        int
 	sanEmail        string
 	usage           string
 	isCA            bool
@@ -79,12 +87,44 @@ func generateRequestTemplate(cmd *cobra.Command, _ []string) error {
 
 	certGenerateOptions.bits = bits
 
-	cn, err := cmd.Flags().GetString("cn")
+	subject, err := cmd.Flags().GetString("subject")
 	if err != nil {
 		return err
 	}
+	s := &sub{}
 
-	certGenerateOptions.cn = cn
+	if strings.TrimSpace(subject) != "" {
+		re := regexp.MustCompile(`/([A-Z]{1,2})=([^/]+)`)
+		matches := re.FindAllStringSubmatch(subject, -1)
+
+		// If subject is non-empty but invalid format, throw error
+		if len(matches) == 0 {
+			return fmt.Errorf("Invalid subject line: %q. Please follow format /C=XX/ST=.../CN=...", subject)
+		}
+
+		for _, match := range matches {
+			key := strings.ToUpper(match[1])
+			val := match[2]
+
+			switch key {
+			case "C":
+				s.c = append(s.c, val)
+			case "O":
+				s.o = append(s.o, val)
+			case "OU":
+				s.ou = append(s.ou, val)
+			case "L":
+				s.l = append(s.l, val)
+			case "ST":
+				s.st = append(s.st, val)
+			case "CN":
+				s.cn = val
+			}
+		}
+
+	}
+
+	certGenerateOptions.subject = s
 
 	keyType, err := cmd.Flags().GetString("key-type")
 	if err != nil {
@@ -135,7 +175,7 @@ func generateRequestTemplate(cmd *cobra.Command, _ []string) error {
 
 	certGenerateOptions.caKeyFilePath = caKeyFilePath
 
-	validity, err := cmd.Flags().GetString("validity")
+	validity, err := cmd.Flags().GetInt("validity")
 	if err != nil {
 		return err
 	}
@@ -196,7 +236,7 @@ func (kt *KeyType) Set(val string) error {
 
 func init() {
 	CertGenerate.Flags().IntVarP(&bits, "bits", "b", 2048, "Key size in bits")
-	CertGenerate.Flags().StringVarP(&cn, "cn", "c", "example.com", "Common Name")
+	CertGenerate.Flags().StringVar(&subject, "subject", "", "Subject for the certificate")
 	CertGenerate.Flags().StringVar(&keyType, "key-type", "rsa", "[rsa|ecdsa|ed25519]")
 	CertGenerate.Flags().StringVar(&dns, "dns", "", "provide DNS for SAN")
 	CertGenerate.Flags().StringVar(&ip, "ip", "", "provide ip address for SAN fields")
@@ -204,7 +244,7 @@ func init() {
 	CertGenerate.Flags().StringVar(&outCertFilePath, "key-out", "", "provide path to store generated key file")
 	CertGenerate.Flags().StringVar(&caCertFilePath, "ca-cert", "", "provide path of root/intermediate certificate")
 	CertGenerate.Flags().StringVar(&caCertFilePath, "ca-key", "", "provide path of root/intermediate key")
-	CertGenerate.Flags().StringVar(&validity, "validity", "365d", "Validity period of the certificate (e.g., 365d, 1y)")
+	CertGenerate.Flags().IntVar(&validity, "validity", 365, "Validity period of the certificate (e.g., 365d, 1y)")
 	CertGenerate.Flags().StringVar(&sanEmail, "san-email", "", "SAN email address")
 	CertGenerate.Flags().StringVar(&usage, "usage", "", "Certificate usage (e.g., server auth, client auth)")
 	CertGenerate.Flags().BoolVar(&isCA, "is-ca", false, "is this a CA certificate?")
@@ -214,71 +254,152 @@ func init() {
 
 func handleCertGeneration(opts *CertGenerateOptions) error {
 
-	_, _, err := generateKeyPair(opts)
+	privateKey, err := generateKeyPair(opts)
 	if err != nil {
 		return err
 	}
 
-	// fmt.Printf("%s", key)
+	template, err := generateCertificateTemplate(opts)
+	if err != nil {
+		return err
+	}
+
+	var certDER []byte
+	// generate self-signed
+	switch priv := privateKey.(type) {
+	case *rsa.PrivateKey:
+		pub := &priv.PublicKey
+		certDER, err = x509.CreateCertificate(rand.Reader, template, template, pub, priv)
+	case *ecdsa.PrivateKey:
+		pub := &priv.PublicKey
+		certDER, err = x509.CreateCertificate(rand.Reader, template, template, pub, priv)
+	case ed25519.PrivateKey:
+		pub := priv.Public().(ed25519.PublicKey)
+		certDER, err = x509.CreateCertificate(rand.Reader, template, template, pub, priv)
+	default:
+		return fmt.Errorf("unsupported private key type: %T", privateKey)
+	}
+
+	// generate cert-chain
+
+	// print cert
+	fmt.Println(pem.Encode(os.Stdout, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certDER,
+	}))
 
 	return nil
 }
 
-func generateKeyPair(opts *CertGenerateOptions) ([]byte, []byte, error) {
+func generateKeyPair(opts *CertGenerateOptions) (privKey any, e error) {
 
 	var privateKey any
-	var publicKey any
 	var err error
 
 	switch strings.ToLower(opts.keyType) {
 	case string(RSA):
 		privateKey, err = rsa.GenerateKey(rand.Reader, opts.bits)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		publicKey = privateKey.(*rsa.PrivateKey).PublicKey
 
 	case string(ECDSA):
 		privateKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		publicKey = privateKey.(*ecdsa.PrivateKey).PublicKey
 
 	case string(ED25519):
-		publicKey, privateKey, err = ed25519.GenerateKey(rand.Reader)
+		_, privateKey, err = ed25519.GenerateKey(rand.Reader)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 	default:
-		return nil, nil, fmt.Errorf("unsupported key type %s", opts.keyType)
+		return nil, fmt.Errorf("unsupported key type %s", opts.keyType)
 	}
 
-	privateDer, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	return privateKey, nil
+}
+
+func encodeToPem(key any, keyType string) ([]byte, error) {
+
+	der, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	privatePem := pem.EncodeToMemory(&pem.Block{
-		Type:  fmt.Sprintf("%s PRIVATE KEY", opts.keyType),
-		Bytes: privateDer,
+	pem := pem.EncodeToMemory(&pem.Block{
+		Type:  keyType,
+		Bytes: der,
 	})
 
-	publicDer, err := x509.MarshalPKIXPublicKey(publicKey)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	publicPem := pem.EncodeToMemory(&pem.Block{
-		Type:  fmt.Sprintf("%s PUBLIC KEY", strings.ToUpper(opts.keyType)),
-		Bytes: publicDer,
-	})
-
-	return publicPem, privatePem, nil
+	return pem, nil
 
 }
 
-// func generateCertificate(opts *CertGenerateOptions) {
+func generateCertificateTemplate(opts *CertGenerateOptions) (*x509.Certificate, error) {
 
-// }
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return nil, err
+	}
+
+	usage, err := parseKeyUsageStrict(opts.usage)
+	if err != nil {
+		return nil, err
+	}
+
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			CommonName:         opts.subject.cn,
+			Country:            opts.subject.c,
+			Organization:       opts.subject.o,
+			OrganizationalUnit: opts.subject.ou,
+			Locality:           opts.subject.l,
+			Province:           opts.subject.st,
+		},
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(time.Duration(opts.validity) * 24 * time.Hour),
+		KeyUsage:  usage,
+		ExtKeyUsage: []x509.ExtKeyUsage{
+			x509.ExtKeyUsageServerAuth,
+			x509.ExtKeyUsageClientAuth,
+		},
+		BasicConstraintsValid: true,
+		IsCA:                  opts.isCA,
+		MaxPathLen:            opts.pathLength,
+	}
+
+	return &template, nil
+
+}
+
+var keyUsageMap = map[string]x509.KeyUsage{
+	"digitalSignature":  x509.KeyUsageDigitalSignature,
+	"contentCommitment": x509.KeyUsageContentCommitment,
+	"keyEncipherment":   x509.KeyUsageKeyEncipherment,
+	"dataEncipherment":  x509.KeyUsageDataEncipherment,
+	"keyAgreement":      x509.KeyUsageKeyAgreement,
+	"keyCertSign":       x509.KeyUsageCertSign,
+	"crlSign":           x509.KeyUsageCRLSign,
+	"encipherOnly":      x509.KeyUsageEncipherOnly,
+	"decipherOnly":      x509.KeyUsageDecipherOnly,
+}
+
+func parseKeyUsageStrict(input string) (x509.KeyUsage, error) {
+	if input == "" {
+		return 0, nil
+	}
+	var usage x509.KeyUsage
+	for _, u := range strings.Split(input, ",") {
+		u = strings.TrimSpace(u)
+		val, ok := keyUsageMap[u]
+		if !ok {
+			return 0, fmt.Errorf("invalid key usage: %s", u)
+		}
+		usage |= val
+	}
+	return usage, nil
+}
