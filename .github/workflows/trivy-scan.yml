@@ -27,7 +27,3 @@ jobs:
           scanners: 'vuln'
           format: 'table'
           severity: 'CRITICAL,HIGH'
-
-      - name: Generate SBOM (Go Source)
-        run: |
-          trivy sbom --format cyclonedx --output sbom-go.cdx.json .
