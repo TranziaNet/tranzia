@@ -2,9 +2,8 @@ name: Publish APT Repo
 
 on:
   workflow_run:
-    workflows: ["Docker Build & Publish"]
-    types:
-      - completed
+    workflows: ["Publish Docker Image"]
+    types: [completed]
 
 jobs:
   publish-apt:
@@ -12,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install required packages
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y dpkg-dev gnupg gh docker.io
@@ -20,10 +19,11 @@ jobs:
       - name: Authenticate GitHub CLI
         run: gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Get release tag
+      - name: Get latest release tag
         id: get_tag
         run: |
-          echo "tag_name=$(gh api repos/${{ github.repository }}/releases/${{ github.event.workflow_run.id }} | jq -r '.tag_name')" >> $GITHUB_OUTPUT
+          TAG=$(gh release view --json tagName -q .tagName)
+          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
 
       - name: Pull Docker image and extract binary
         run: |
@@ -65,27 +65,23 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
 
       - name: Import GPG private key
-        run: |
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
 
-      - name: Update APT repository with new package
+      - name: Update APT repository
         run: |
           TAG=${{ steps.get_tag.outputs.tag_name }}
           cp tranzia_${TAG}_amd64.deb apt-repo/pool/main/t/tranzia/
           cd apt-repo
-
-          mkdir -p dists/stable/main/binary-amd64
           dpkg-scanpackages pool /dev/null > dists/stable/main/binary-amd64/Packages
           gzip -9c dists/stable/main/binary-amd64/Packages > dists/stable/main/binary-amd64/Packages.gz
-
           apt-ftparchive release dists/stable > dists/stable/Release
           gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" -abs -o dists/stable/Release.gpg dists/stable/Release
 
-      - name: Commit and push APT repo updates
+      - name: Commit and push APT repo update
         run: |
           cd apt-repo
           git config user.name "Tranzia Bot"
           git config user.email "bot@tranzia.dev"
           git add .
-          git commit -m "APT repo update for ${{ steps.get_tag.outputs.tag_name }}" || echo "No changes to commit"
+          git commit -m "APT repo update for $TAG" || echo "No changes"
           git push origin gh-pages
