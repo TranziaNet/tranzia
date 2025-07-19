@@ -31,7 +31,7 @@ jobs:
           TAG=${{ steps.get_tag.outputs.tag_name }}
           docker pull ghcr.io/tranzianet/tranzia:$TAG
           docker create --name tranzia-builder ghcr.io/tranzianet/tranzia:$TAG
-          docker cp tranzia-builder:/tranzia ./tranzia
+          docker cp tranzia-builder:/usr/local/bin/tranzia ./tranzia
           docker rm tranzia-builder
           chmod +x tranzia
 
