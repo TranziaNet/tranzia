@@ -17,14 +17,14 @@ jobs:
           sudo apt-get install -y dpkg-dev gnupg gh curl
           curl -fsSL https://get.docker.com | sh
 
-      - name: Authenticate GitHub CLI
-        run: gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
-
-      - name: Get latest release tag
+      - name: Extract tag from triggering workflow
         id: get_tag
         run: |
-          TAG=$(gh release view -R tranzianet/tranzia --json tagName -q .tagName)
+          TAG=$(echo "${{ github.event.workflow_run.head_branch }}" | sed 's/refs\/tags\///')
           echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Authenticate GitHub CLI
+        run: gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Pull Docker image and extract binary
         run: |
