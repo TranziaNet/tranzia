@@ -23,7 +23,7 @@ jobs:
       - name: Get latest release tag
         id: get_tag
         run: |
-          TAG=$(gh release view --json tagName -q .tagName)
+          TAG=$(gh release view -R tranzianet/tranzia --json tagName -q .tagName)
           echo "tag_name=$TAG" >> $GITHUB_OUTPUT
 
       - name: Pull Docker image and extract binary
