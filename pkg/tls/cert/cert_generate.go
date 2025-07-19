@@ -20,20 +20,19 @@ import (
 )
 
 type CertGenerateOptions struct {
-	bits            int
-	subject         *sub
-	keyType         string
-	dns             string
-	ip              string
-	caCertFilePath  string
-	caKeyFilePath   string
-	outCertFilePath string
-	outKeyFilePath  string
-	validity        int
-	sanEmail        string
-	usage           string
-	isCA            bool
-	pathLength      int
+	bits    int
+	subject *sub
+	keyType string
+	//caCertFilePath     string
+	//caKeyFilePath      string
+	outCertFilePath    string
+	outPrivKeyFilePath string
+	outPubKeyFilePath  string
+	validity           int
+	//sanEmail           string
+	usage string
+	isCA  bool
+	//pathLength         int
 }
 type sub struct {
 	c  []string
@@ -45,21 +44,41 @@ type sub struct {
 }
 
 var (
-	bits            int
-	subject         string
-	keyType         string
-	dns             string
-	ip              string
-	caCertFilePath  string
-	caKeyFilePath   string
-	outCertFilePath string
-	outKeyFilePath  string
-	validity        int
-	sanEmail        string
-	usage           string
-	isCA            bool
-	pathLength      int
+	bits               int
+	subject            string
+	keyType            string
+	caCertFilePath     string
+	caKeyFilePath      string
+	outCertFilePath    string
+	outPrivKeyFilePath string
+	outPubKeyFilePath  string
+	validity           int
+	sanEmail           string
+	usage              string
+	isCA               bool
+	pathLength         int
 )
+
+type KeyType string
+
+const (
+	RSA     KeyType = "rsa"
+	ECDSA   KeyType = "ecdsa"
+	ED25519 KeyType = "ed25519"
+)
+
+func (kt *KeyType) String() string {
+	return string(*kt)
+}
+
+func (kt *KeyType) Set(val string) error {
+	switch val {
+	case "rsa", "ecdsa", "ed25519":
+		*kt = KeyType(val)
+		return nil
+	}
+	return fmt.Errorf("key type not supported: %s", val)
+}
 
 var certGenerateOptions CertGenerateOptions
 
@@ -133,20 +152,6 @@ func generateRequestTemplate(cmd *cobra.Command, _ []string) error {
 
 	certGenerateOptions.keyType = keyType
 
-	dns, err := cmd.Flags().GetString("dns")
-	if err != nil {
-		return err
-	}
-
-	certGenerateOptions.dns = dns
-
-	ip, err := cmd.Flags().GetString("ip")
-	if err != nil {
-		return err
-	}
-
-	certGenerateOptions.ip = ip
-
 	outCertFilePath, err := cmd.Flags().GetString("cert-out")
 	if err != nil {
 		return err
@@ -154,26 +159,33 @@ func generateRequestTemplate(cmd *cobra.Command, _ []string) error {
 
 	certGenerateOptions.outCertFilePath = outCertFilePath
 
-	outKeyFilePath, err := cmd.Flags().GetString("key-out")
+	outPrivKeyFilePath, err := cmd.Flags().GetString("private-key-out")
 	if err != nil {
 		return err
 	}
 
-	certGenerateOptions.outKeyFilePath = outKeyFilePath
+	certGenerateOptions.outPrivKeyFilePath = outPrivKeyFilePath
 
-	caCertFilePath, err := cmd.Flags().GetString("ca-cert")
+	outPubKeyFilePath, err := cmd.Flags().GetString("public-key-out")
 	if err != nil {
 		return err
 	}
 
-	certGenerateOptions.caCertFilePath = caCertFilePath
+	certGenerateOptions.outPubKeyFilePath = outPubKeyFilePath
 
-	caKeyFilePath, err := cmd.Flags().GetString("ca-key")
-	if err != nil {
-		return err
-	}
+	// caCertFilePath, err := cmd.Flags().GetString("ca-cert")
+	// if err != nil {
+	// 	return err
+	// }
 
-	certGenerateOptions.caKeyFilePath = caKeyFilePath
+	// certGenerateOptions.caCertFilePath = caCertFilePath
+
+	// caKeyFilePath, err := cmd.Flags().GetString("ca-key")
+	// if err != nil {
+	// 	return err
+	// }
+
+	// certGenerateOptions.caKeyFilePath = caKeyFilePath
 
 	validity, err := cmd.Flags().GetInt("validity")
 	if err != nil {
@@ -182,12 +194,12 @@ func generateRequestTemplate(cmd *cobra.Command, _ []string) error {
 
 	certGenerateOptions.validity = validity
 
-	sanEmail, err := cmd.Flags().GetString("san-email")
-	if err != nil {
-		return err
-	}
+	// sanEmail, err := cmd.Flags().GetString("san-email")
+	// if err != nil {
+	// 	return err
+	// }
 
-	certGenerateOptions.sanEmail = sanEmail
+	// certGenerateOptions.sanEmail = sanEmail
 
 	usage, err := cmd.Flags().GetString("usage")
 	if err != nil {
@@ -203,52 +215,30 @@ func generateRequestTemplate(cmd *cobra.Command, _ []string) error {
 
 	certGenerateOptions.isCA = isCA
 
-	pathLength, err := cmd.Flags().GetInt("path-length")
-	if err != nil {
-		return err
-	}
+	// pathLength, err := cmd.Flags().GetInt("path-length")
+	// if err != nil {
+	// 	return err
+	// }
 
-	certGenerateOptions.pathLength = pathLength
+	// certGenerateOptions.pathLength = pathLength
 
 	return nil
-}
-
-type KeyType string
-
-const (
-	RSA     KeyType = "rsa"
-	ECDSA   KeyType = "ecdsa"
-	ED25519 KeyType = "ed25519"
-)
-
-func (kt *KeyType) String() string {
-	return string(*kt)
-}
-
-func (kt *KeyType) Set(val string) error {
-	switch val {
-	case "rsa", "ecdsa", "ed25519":
-		*kt = KeyType(val)
-		return nil
-	}
-	return fmt.Errorf("key type not supported: %s", val)
 }
 
 func init() {
 	CertGenerate.Flags().IntVarP(&bits, "bits", "b", 2048, "Key size in bits")
 	CertGenerate.Flags().StringVar(&subject, "subject", "", "Subject for the certificate")
-	CertGenerate.Flags().StringVar(&keyType, "key-type", "rsa", "[rsa|ecdsa|ed25519]")
-	CertGenerate.Flags().StringVar(&dns, "dns", "", "provide DNS for SAN")
-	CertGenerate.Flags().StringVar(&ip, "ip", "", "provide ip address for SAN fields")
+	CertGenerate.Flags().StringVar(&keyType, "key-type", "rsa", "[ rsa | ecdsa | ed25519 ]")
 	CertGenerate.Flags().StringVar(&outCertFilePath, "cert-out", "", "provide path to store generated cert file")
-	CertGenerate.Flags().StringVar(&outCertFilePath, "key-out", "", "provide path to store generated key file")
-	CertGenerate.Flags().StringVar(&caCertFilePath, "ca-cert", "", "provide path of root/intermediate certificate")
-	CertGenerate.Flags().StringVar(&caCertFilePath, "ca-key", "", "provide path of root/intermediate key")
+	CertGenerate.Flags().StringVar(&outPrivKeyFilePath, "private-key-out", "", "provide path to store generated private key file")
+	CertGenerate.Flags().StringVar(&outPubKeyFilePath, "public-key-out", "", "provide path to store generated public key file")
+	//CertGenerate.Flags().StringVar(&caCertFilePath, "ca-cert", "", "provide path of root/intermediate certificate")
+	//CertGenerate.Flags().StringVar(&caCertFilePath, "ca-key", "", "provide path of root/intermediate key")
 	CertGenerate.Flags().IntVar(&validity, "validity", 365, "Validity period of the certificate (e.g., 365d, 1y)")
-	CertGenerate.Flags().StringVar(&sanEmail, "san-email", "", "SAN email address")
+	//CertGenerate.Flags().StringVar(&sanEmail, "san-email", "", "SAN email address")
 	CertGenerate.Flags().StringVar(&usage, "usage", "", "Certificate usage (e.g., server auth, client auth)")
 	CertGenerate.Flags().BoolVar(&isCA, "is-ca", false, "is this a CA certificate?")
-	CertGenerate.Flags().IntVar(&pathLength, "path-length", -1, "Path length for CA certificate")
+	//CertGenerate.Flags().IntVar(&pathLength, "path-length", -1, "Path length for CA certificate")
 
 }
 
@@ -283,12 +273,10 @@ func handleCertGeneration(opts *CertGenerateOptions) error {
 	// generate cert-chain
 
 	// print cert
-	fmt.Println(pem.Encode(os.Stdout, &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: certDER,
-	}))
 
-	return nil
+	generateOutput(privateKey, certDER, opts)
+
+	return err
 }
 
 func generateKeyPair(opts *CertGenerateOptions) (privKey any, e error) {
@@ -304,7 +292,18 @@ func generateKeyPair(opts *CertGenerateOptions) (privKey any, e error) {
 		}
 
 	case string(ECDSA):
-		privateKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		var curve elliptic.Curve
+		switch bits {
+		case 256:
+			curve = elliptic.P256()
+		case 384:
+			curve = elliptic.P384()
+		case 521:
+			curve = elliptic.P521()
+		default:
+			curve = elliptic.P256()
+		}
+		privateKey, err = ecdsa.GenerateKey(curve, rand.Reader)
 		if err != nil {
 			return nil, err
 		}
@@ -322,22 +321,6 @@ func generateKeyPair(opts *CertGenerateOptions) (privKey any, e error) {
 	return privateKey, nil
 }
 
-func encodeToPem(key any, keyType string) ([]byte, error) {
-
-	der, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		return nil, err
-	}
-
-	pem := pem.EncodeToMemory(&pem.Block{
-		Type:  keyType,
-		Bytes: der,
-	})
-
-	return pem, nil
-
-}
-
 func generateCertificateTemplate(opts *CertGenerateOptions) (*x509.Certificate, error) {
 
 	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
@@ -345,7 +328,7 @@ func generateCertificateTemplate(opts *CertGenerateOptions) (*x509.Certificate, 
 		return nil, err
 	}
 
-	usage, err := parseKeyUsageStrict(opts.usage)
+	usage, err := ParseKeyUsageStrict(opts.usage)
 	if err != nil {
 		return nil, err
 	}
@@ -360,46 +343,110 @@ func generateCertificateTemplate(opts *CertGenerateOptions) (*x509.Certificate, 
 			Locality:           opts.subject.l,
 			Province:           opts.subject.st,
 		},
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(time.Duration(opts.validity) * 24 * time.Hour),
-		KeyUsage:  usage,
-		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageServerAuth,
-			x509.ExtKeyUsageClientAuth,
-		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Duration(opts.validity) * 24 * time.Hour),
+		KeyUsage:              usage,
 		BasicConstraintsValid: true,
 		IsCA:                  opts.isCA,
-		MaxPathLen:            opts.pathLength,
+		// MaxPathLen:            opts.pathLength,
 	}
 
 	return &template, nil
 
 }
 
-var keyUsageMap = map[string]x509.KeyUsage{
-	"digitalSignature":  x509.KeyUsageDigitalSignature,
-	"contentCommitment": x509.KeyUsageContentCommitment,
-	"keyEncipherment":   x509.KeyUsageKeyEncipherment,
-	"dataEncipherment":  x509.KeyUsageDataEncipherment,
-	"keyAgreement":      x509.KeyUsageKeyAgreement,
-	"keyCertSign":       x509.KeyUsageCertSign,
-	"crlSign":           x509.KeyUsageCRLSign,
-	"encipherOnly":      x509.KeyUsageEncipherOnly,
-	"decipherOnly":      x509.KeyUsageDecipherOnly,
+func generateOutput(privateKey any, cert []byte, opts *CertGenerateOptions) error {
+
+	// print generated cert to stdout
+	err := pem.Encode(os.Stdout, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert,
+	})
+
+	// print private key to stdout
+	var pemEncodedPrivateKey []byte
+	var pemEncodedPublicKey []byte
+
+	switch k := privateKey.(type) {
+	case *rsa.PrivateKey:
+		pemEncodedPrivateKey, err = EncodeToPem(privateKey, "RSA PRIVATE KEY")
+		if err != nil {
+			return err
+		}
+		pubBytes, err := x509.MarshalPKIXPublicKey(&k.PublicKey)
+		if err != nil {
+			return err
+		}
+		pemEncodedPublicKey = pem.EncodeToMemory(&pem.Block{
+			Type:  "RSA PUBLIC KEY",
+			Bytes: pubBytes,
+		})
+
+	case *ecdsa.PrivateKey:
+		pemEncodedPrivateKey, err = EncodeToPem(privateKey, "EC PRIVATE KEY")
+		if err != nil {
+			return err
+		}
+		pubBytes, err := x509.MarshalPKIXPublicKey(&k.PublicKey)
+		if err != nil {
+			return err
+		}
+		pemEncodedPublicKey = pem.EncodeToMemory(&pem.Block{
+			Type:  "EC PUBLIC KEY",
+			Bytes: pubBytes,
+		})
+
+	case ed25519.PrivateKey:
+		pemEncodedPrivateKey, err = EncodeToPem(privateKey, "PRIVATE KEY")
+		if err != nil {
+			return err
+		}
+		pubBytes, err := x509.MarshalPKIXPublicKey(k.Public())
+		if err != nil {
+			return err
+		}
+		pemEncodedPublicKey = pem.EncodeToMemory(&pem.Block{
+			Type:  "PUBLIC KEY",
+			Bytes: pubBytes,
+		})
+	default:
+		fmt.Printf("Unknown private key type: %T\n", privateKey)
+	}
+
+	fmt.Printf("%s", pemEncodedPrivateKey)
+
+	// write data to files
+	if opts.outCertFilePath != "" {
+		file, err := os.Create(outCertFilePath)
+		if err != nil {
+			panic(err)
+		}
+		defer file.Close()
+
+		err = pem.Encode(file, &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: cert,
+		})
+
+	}
+
+	if opts.outPrivKeyFilePath != "" {
+		err := os.WriteFile(opts.outPrivKeyFilePath, pemEncodedPrivateKey, 0644)
+		if err != nil {
+			panic(fmt.Errorf("failed to write private key file: %w", err))
+		}
+	}
+
+	if opts.outPubKeyFilePath != "" {
+		err := os.WriteFile(opts.outPubKeyFilePath, pemEncodedPublicKey, 0644)
+		if err != nil {
+			panic(fmt.Errorf("failed to write public key file: %w", err))
+		}
+	}
+
+	return nil
 }
 
-func parseKeyUsageStrict(input string) (x509.KeyUsage, error) {
-	if input == "" {
-		return 0, nil
-	}
-	var usage x509.KeyUsage
-	for _, u := range strings.Split(input, ",") {
-		u = strings.TrimSpace(u)
-		val, ok := keyUsageMap[u]
-		if !ok {
-			return 0, fmt.Errorf("invalid key usage: %s", u)
-		}
-		usage |= val
-	}
-	return usage, nil
+func writeToFile(data any) {
+
 }
