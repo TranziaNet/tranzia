@@ -37,9 +37,20 @@ jobs:
           docker rm tranzia-builder
           chmod +x tranzia
 
+      - name: Configure GPG for CI signing
+        run: |
+          export GPG_TTY=$(tty)
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg.conf
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+
+      - name: Import GPG private key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+
       - name: Create .deb package
         run: |
-          TAG=${{ steps.get_tag.outputs.tag_name }}
           VERSION=${{ steps.get_tag.outputs.clean_tag }}
           mkdir -p package/DEBIAN package/usr/local/bin
           cat <<EOF > package/DEBIAN/control
@@ -48,7 +59,7 @@ jobs:
           Section: network
           Priority: optional
           Architecture: amd64
-          Maintainer: Ashish Naware ashishnaware3@gmail.com
+          Maintainer: Ashish Naware <ashishnaware3@gmail.com>
           Description: Tranzia CLI - Network testing and observability
           EOF
           cp tranzia package/usr/local/bin/
@@ -69,10 +80,7 @@ jobs:
           path: apt-repo
           token: ${{ secrets.GH_TOKEN }}
 
-      - name: Import GPG private key
-        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-
-      - name: Update APT repository
+      - name: Update APT repository and sign index
         run: |
           VERSION=${{ steps.get_tag.outputs.clean_tag }}
           cp tranzia_${VERSION}_amd64.deb apt-repo/pool/main/t/tranzia/
@@ -81,7 +89,7 @@ jobs:
           dpkg-scanpackages pool /dev/null > dists/stable/main/binary-amd64/Packages
           gzip -9c dists/stable/main/binary-amd64/Packages > dists/stable/main/binary-amd64/Packages.gz
           apt-ftparchive release dists/stable > dists/stable/Release
-          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+          gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
             -abs -o dists/stable/Release.gpg dists/stable/Release
 
       - name: Commit and push APT repo updates
