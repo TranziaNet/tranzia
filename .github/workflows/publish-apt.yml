@@ -1,61 +1,91 @@
-name: Publish APT Repo on Release
+name: Publish APT Repo
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Docker Build & Publish"]
+    types:
+      - completed
 
 jobs:
   publish-apt:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout main repo
-        uses: actions/checkout@v4
-
       - name: Install required packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev gnupg gh
+          sudo apt-get install -y dpkg-dev gnupg gh docker.io
 
       - name: Authenticate GitHub CLI
         run: gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Download .deb from latest release
+      - name: Get release tag
+        id: get_tag
         run: |
-          gh release download "${{ github.event.release.tag_name }}" --pattern "*.deb"
+          echo "tag_name=$(gh api repos/${{ github.repository }}/releases/${{ github.event.workflow_run.id }} | jq -r '.tag_name')" >> $GITHUB_OUTPUT
 
-      - name: Clone APT repo
+      - name: Pull Docker image and extract binary
+        run: |
+          TAG=${{ steps.get_tag.outputs.tag_name }}
+          docker pull ghcr.io/tranzianet/tranzia:$TAG
+          docker create --name tranzia-builder ghcr.io/tranzianet/tranzia:$TAG
+          docker cp tranzia-builder:/tranzia ./tranzia
+          docker rm tranzia-builder
+          chmod +x tranzia
+
+      - name: Create .deb package
+        run: |
+          TAG=${{ steps.get_tag.outputs.tag_name }}
+          mkdir -p package/DEBIAN package/usr/local/bin
+          cat <<EOF > package/DEBIAN/control
+          Package: tranzia
+          Version: ${TAG}
+          Section: network
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Ashish Naware <you@example.com>
+          Description: Tranzia CLI - Network testing and observability
+          EOF
+          cp tranzia package/usr/local/bin/
+          dpkg-deb --build package tranzia_${TAG}_amd64.deb
+
+      - name: Upload .deb to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: tranzia_${{ steps.get_tag.outputs.tag_name }}_amd64.deb
+          tag_name: ${{ steps.get_tag.outputs.tag_name }}
+
+      - name: Clone APT repository
         uses: actions/checkout@v4
         with:
           repository: tranzianet/tranzia-apt-repo
-          path: apt-repo
           ref: gh-pages
+          path: apt-repo
           token: ${{ secrets.GH_TOKEN }}
 
       - name: Import GPG private key
         run: |
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-          gpg --list-keys
 
-      - name: Copy .deb and update APT index
+      - name: Update APT repository with new package
         run: |
-          mkdir -p apt-repo/pool/main/t/tranzia
-          cp *.deb apt-repo/pool/main/t/tranzia/
-
-          mkdir -p apt-repo/dists/stable/main/binary-amd64
+          TAG=${{ steps.get_tag.outputs.tag_name }}
+          cp tranzia_${TAG}_amd64.deb apt-repo/pool/main/t/tranzia/
           cd apt-repo
+
+          mkdir -p dists/stable/main/binary-amd64
           dpkg-scanpackages pool /dev/null > dists/stable/main/binary-amd64/Packages
           gzip -9c dists/stable/main/binary-amd64/Packages > dists/stable/main/binary-amd64/Packages.gz
 
           apt-ftparchive release dists/stable > dists/stable/Release
-          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
-              -abs -o dists/stable/Release.gpg dists/stable/Release
+          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" -abs -o dists/stable/Release.gpg dists/stable/Release
 
-      - name: Commit and push to APT repo
+      - name: Commit and push APT repo updates
         run: |
           cd apt-repo
           git config user.name "Tranzia Bot"
           git config user.email "bot@tranzia.dev"
           git add .
-          git commit -m "Update APT repo from release ${{ github.event.release.tag_name }}" || echo "No changes to commit"
+          git commit -m "APT repo update for ${{ steps.get_tag.outputs.tag_name }}" || echo "No changes to commit"
           git push origin gh-pages
