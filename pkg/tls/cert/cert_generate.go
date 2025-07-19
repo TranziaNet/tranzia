@@ -446,7 +446,3 @@ func generateOutput(privateKey any, cert []byte, opts *CertGenerateOptions) erro
 
 	return nil
 }
-
-func writeToFile(data any) {
-
-}
