@@ -11,10 +11,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install dependencies
+      - name: Install required packages (Docker via script)
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev gnupg gh docker.io
+          sudo apt-get install -y dpkg-dev gnupg gh curl
+          curl -fsSL https://get.docker.com | sh
 
       - name: Authenticate GitHub CLI
         run: gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
@@ -72,12 +73,14 @@ jobs:
           TAG=${{ steps.get_tag.outputs.tag_name }}
           cp tranzia_${TAG}_amd64.deb apt-repo/pool/main/t/tranzia/
           cd apt-repo
+          mkdir -p dists/stable/main/binary-amd64
           dpkg-scanpackages pool /dev/null > dists/stable/main/binary-amd64/Packages
           gzip -9c dists/stable/main/binary-amd64/Packages > dists/stable/main/binary-amd64/Packages.gz
           apt-ftparchive release dists/stable > dists/stable/Release
-          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" -abs -o dists/stable/Release.gpg dists/stable/Release
+          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+            -abs -o dists/stable/Release.gpg dists/stable/Release
 
-      - name: Commit and push APT repo update
+      - name: Commit and push APT repo updates
         run: |
           cd apt-repo
           git config user.name "Tranzia Bot"
