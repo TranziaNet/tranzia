@@ -17,11 +17,13 @@ jobs:
           sudo apt-get install -y dpkg-dev gnupg gh curl
           curl -fsSL https://get.docker.com | sh
 
-      - name: Extract tag from triggering workflow
+      - name: Extract full and clean tag from triggering workflow
         id: get_tag
         run: |
-          TAG=$(echo "${{ github.event.workflow_run.head_branch }}" | sed 's/refs\/tags\///')
+          TAG=$(echo "${{ github.event.workflow_run.head_branch }}" | sed 's|refs/tags/||')
+          CLEAN_TAG=$(echo "$TAG" | sed 's/^v//')
           echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+          echo "clean_tag=$CLEAN_TAG" >> $GITHUB_OUTPUT
 
       - name: Authenticate GitHub CLI
         run: gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
@@ -38,10 +40,11 @@ jobs:
       - name: Create .deb package
         run: |
           TAG=${{ steps.get_tag.outputs.tag_name }}
+          VERSION=${{ steps.get_tag.outputs.clean_tag }}
           mkdir -p package/DEBIAN package/usr/local/bin
           cat <<EOF > package/DEBIAN/control
           Package: tranzia
-          Version: ${TAG}
+          Version: ${VERSION}
           Section: network
           Priority: optional
           Architecture: amd64
@@ -49,12 +52,12 @@ jobs:
           Description: Tranzia CLI - Network testing and observability
           EOF
           cp tranzia package/usr/local/bin/
-          dpkg-deb --build package tranzia_${TAG}_amd64.deb
+          dpkg-deb --build package tranzia_${VERSION}_amd64.deb
 
       - name: Upload .deb to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: tranzia_${{ steps.get_tag.outputs.tag_name }}_amd64.deb
+          files: tranzia_${{ steps.get_tag.outputs.clean_tag }}_amd64.deb
           tag_name: ${{ steps.get_tag.outputs.tag_name }}
 
       - name: Clone APT repository
@@ -70,8 +73,8 @@ jobs:
 
       - name: Update APT repository
         run: |
-          TAG=${{ steps.get_tag.outputs.tag_name }}
-          cp tranzia_${TAG}_amd64.deb apt-repo/pool/main/t/tranzia/
+          VERSION=${{ steps.get_tag.outputs.clean_tag }}
+          cp tranzia_${VERSION}_amd64.deb apt-repo/pool/main/t/tranzia/
           cd apt-repo
           mkdir -p dists/stable/main/binary-amd64
           dpkg-scanpackages pool /dev/null > dists/stable/main/binary-amd64/Packages
@@ -82,9 +85,10 @@ jobs:
 
       - name: Commit and push APT repo updates
         run: |
+          VERSION=${{ steps.get_tag.outputs.clean_tag }}
           cd apt-repo
           git config user.name "Tranzia Bot"
           git config user.email "bot@tranzia.dev"
           git add .
-          git commit -m "APT repo update for $TAG" || echo "No changes"
+          git commit -m "APT repo update for ${VERSION}" || echo "No changes"
           git push origin gh-pages
