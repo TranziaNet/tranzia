@@ -1,4 +1,4 @@
-name: Trivy Security and SBOM Scan
+name: Trivy Code Security Scan
 
 on:
   pull_request:
@@ -6,48 +6,28 @@ on:
     branches: [ main ]
 
 jobs:
-  trivy:
-    name: Trivy Scans
+  trivy-scan:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Secret and Configuration Scan (source code)
       - name: Scan Secrets and Config
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           scanners: 'secret,config'
-          ignore-unfixed: true
           format: 'table'
           severity: 'CRITICAL,HIGH'
 
-      # Dependency Vulnerability Scan (Go Modules)
       - name: Scan Go Dependencies
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           scanners: 'vuln'
-          ignore-unfixed: true
           format: 'table'
           severity: 'CRITICAL,HIGH'
 
-      # Docker Image Vulnerability Scan
-      - name: Scan Docker Image Vulnerabilities
-        continue-on-error: true  # Optional: doesn't fail PR if image not yet pushed
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'image'
-          image-ref: 'ghcr.io/tranzianet/tranzia:latest'
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
-
-      # SBOM Generation
-      - name: Generate SBOM (Source Code)
+      - name: Generate SBOM (Go Source)
         run: |
-          trivy sbom --format cyclonedx --output sbom-source.cdx.json .
-
-      - name: Generate SBOM (Docker Image)
-        run: |
-          trivy sbom --format cyclonedx --output sbom-image.cdx.json ghcr.io/tranzianet/tranzia:latest
+          trivy sbom --format cyclonedx --output sbom-go.cdx.json .

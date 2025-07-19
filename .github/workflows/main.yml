@@ -30,6 +30,14 @@ jobs:
             -t ghcr.io/tranzianet/tranzia:latest \
             .
 
+      - name: Trivy Scan - Docker Image Vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          image-ref: 'ghcr.io/tranzianet/tranzia:latest'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
       - name: Push Docker image
         run: |
           docker push ghcr.io/tranzianet/tranzia:${{ steps.tag.outputs.tag_name }}
