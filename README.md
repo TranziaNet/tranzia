@@ -1,5 +1,12 @@
 # 🌐 Tranzia
 
+![Build](https://github.com/TranziaNet/tranzia/actions/workflows/build-publish.yml/badge.svg)
+![Trivy Scan](https://github.com/TranziaNet/tranzia/actions/workflows/trivy-scan.yml/badge.svg)
+[![Go Report Card](https://goreportcard.com/badge/github.com/TranziaNet/tranzia)](https://goreportcard.com/report/github.com/TranziaNet/tranzia)
+![License](https://img.shields.io/github/license/TranziaNet/tranzia)
+![Release](https://img.shields.io/github/v/release/TranziaNet/tranzia)
+![Docker Pulls](https://img.shields.io/docker/pulls/ghcr.io/tranzianet/tranzia?logo=docker)
+
 🚀 **Tranzia** is a modern, **all-in-one CLI toolkit for network testing and debugging**, aiming to unify the functionalities of tools like `nc`, `curl`, `openssl`, and `tcpdump` under a **single, extensible CLI**.
 
 **⚠️ Note:** Tranzia is in **active early development** — expect frequent updates and evolving features.

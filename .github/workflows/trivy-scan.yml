@@ -1,0 +1,29 @@
+name: Trivy Code Security Scan
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  trivy-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Scan Secrets and Config
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scanners: 'secret,config'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Scan Go Dependencies
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scanners: 'vuln'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
