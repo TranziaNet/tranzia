@@ -48,7 +48,7 @@ jobs:
           Section: network
           Priority: optional
           Architecture: amd64
-          Maintainer: Ashish Naware <you@example.com>
+          Maintainer: Ashish Naware ashishnaware3@gmail.com
           Description: Tranzia CLI - Network testing and observability
           EOF
           cp tranzia package/usr/local/bin/
