@@ -1,4 +1,4 @@
-name: Publish APT Repo
+name: Publish APT Repo (Stable vs Testing)
 
 on:
   workflow_run:
@@ -11,19 +11,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install required packages (Docker via script)
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y dpkg-dev gnupg gh curl
           curl -fsSL https://get.docker.com | sh
 
-      - name: Extract full and clean tag from triggering workflow
+      - name: Extract full and clean tag
         id: get_tag
         run: |
           TAG=$(echo "${{ github.event.workflow_run.head_branch }}" | sed 's|refs/tags/||')
           CLEAN_TAG=$(echo "$TAG" | sed 's/^v//')
+          if echo "$TAG" | grep -Eq "alpha|beta|rc"; then
+            DIST="testing"
+          else
+            DIST="stable"
+          fi
           echo "tag_name=$TAG" >> $GITHUB_OUTPUT
           echo "clean_tag=$CLEAN_TAG" >> $GITHUB_OUTPUT
+          echo "dist=$DIST" >> $GITHUB_OUTPUT
 
       - name: Authenticate GitHub CLI
         run: gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
@@ -37,7 +43,7 @@ jobs:
           docker rm tranzia-builder
           chmod +x tranzia
 
-      - name: Configure GPG for CI signing
+      - name: Configure GPG for CI
         run: |
           export GPG_TTY=$(tty)
           mkdir -p ~/.gnupg
@@ -80,24 +86,26 @@ jobs:
           path: apt-repo
           token: ${{ secrets.GH_TOKEN }}
 
-      - name: Update APT repository and sign index
+      - name: Update APT repository (stable or testing)
         run: |
+          DIST=${{ steps.get_tag.outputs.dist }}
           VERSION=${{ steps.get_tag.outputs.clean_tag }}
           cp tranzia_${VERSION}_amd64.deb apt-repo/pool/main/t/tranzia/
           cd apt-repo
-          mkdir -p dists/stable/main/binary-amd64
-          dpkg-scanpackages pool /dev/null > dists/stable/main/binary-amd64/Packages
-          gzip -9c dists/stable/main/binary-amd64/Packages > dists/stable/main/binary-amd64/Packages.gz
-          apt-ftparchive release dists/stable > dists/stable/Release
+          mkdir -p dists/$DIST/main/binary-amd64
+          dpkg-scanpackages pool /dev/null > dists/$DIST/main/binary-amd64/Packages
+          gzip -9c dists/$DIST/main/binary-amd64/Packages > dists/$DIST/main/binary-amd64/Packages.gz
+          apt-ftparchive release dists/$DIST > dists/$DIST/Release
           gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
-            -abs -o dists/stable/Release.gpg dists/stable/Release
+            -abs -o dists/$DIST/Release.gpg dists/$DIST/Release
 
-      - name: Commit and push APT repo updates
+      - name: Commit and push APT updates
         run: |
+          DIST=${{ steps.get_tag.outputs.dist }}
           VERSION=${{ steps.get_tag.outputs.clean_tag }}
           cd apt-repo
           git config user.name "Tranzia Bot"
           git config user.email "bot@tranzia.dev"
           git add .
-          git commit -m "APT repo update for ${VERSION}" || echo "No changes"
+          git commit -m "APT repo update for ${VERSION} -> ${DIST}" || echo "No changes"
           git push origin gh-pages
