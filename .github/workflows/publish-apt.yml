@@ -59,6 +59,7 @@ jobs:
         with:
           files: tranzia_${{ steps.get_tag.outputs.clean_tag }}_amd64.deb
           tag_name: ${{ steps.get_tag.outputs.tag_name }}
+          token: ${{ secrets.GH_TOKEN }}
 
       - name: Clone APT repository
         uses: actions/checkout@v4
