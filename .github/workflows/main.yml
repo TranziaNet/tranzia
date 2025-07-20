@@ -38,16 +38,6 @@ jobs:
           format: 'table'
           severity: 'CRITICAL,HIGH'
 
-      - name: Generate SBOM (Docker Image)
-        run: |
-          trivy sbom --format cyclonedx --output sbom.cdx.json ghcr.io/tranzianet/tranzia:latest
-
-      - name: Upload SBOM Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom-cyclonedx
-          path: sbom.cdx.json
-
       - name: Push Docker image
         run: |
           docker push ghcr.io/tranzianet/tranzia:${{ steps.tag.outputs.tag_name }}
