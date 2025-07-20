@@ -1,0 +1,40 @@
+site_name: Tranzia CLI Documentation
+site_description: All-in-one CLI toolkit for network testing and debugging
+site_url: https://tranzianet.github.io/tranzia/
+repo_url: https://github.com/TranziaNet/tranzia
+repo_name: TranziaNet/tranzia
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+  language: en
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/TranziaNet/tranzia
+      name: GitHub
+
+nav:
+  - Overview: index.md
+  - Quick Start: quickstart.md
+  - Commands:
+      - TCP Client: tranzia_tcp_client.md
+      - TCP Server: tranzia_tcp_server.md
+      - TLS:
+          - TLS Overview: tranzia_tls.md
+          - Certificate Commands:
+              - Generate: tranzia_tls_cert_generate.md
+  - Community: contributing.md
+  - Changelog: changelog.md
