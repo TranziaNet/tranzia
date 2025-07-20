@@ -6,9 +6,11 @@ import (
 )
 
 func init() {
-	TlsCommand.AddCommand(&cert.CertCommand)
+	TlsCommand.AddCommand(cert.CertCommand)
 }
 
-var TlsCommand = cobra.Command{
-	Use: "tls",
+var TlsCommand = &cobra.Command{
+	Use:   "tls",
+	Short: "TLS tools (certificate generation, handshake testing etc)",
+	Long:  "TLS tools including certificate management and handshake testing commands under Tranzia.",
 }

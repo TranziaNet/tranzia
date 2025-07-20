@@ -82,9 +82,20 @@ func (kt *KeyType) Set(val string) error {
 
 var certGenerateOptions CertGenerateOptions
 
-var CertGenerate = cobra.Command{
+var CertGenerate = &cobra.Command{
 	Use:   "generate",
 	Short: "Generate a new TLS certificate",
+	Long:  "Generate a new TLS certificate using customizable options like key type, SANs, validity, and CA signing through Tranzia.",
+	Example: `
+# Generate a 4096-bit RSA certificate valid for 1 year
+tranzia tls cert generate --key-type rsa --bits 4096 --subject "/CN=example.com/L=San Francisco/O=TranziaNet/C=US"
+
+# Generate ECDSA certificate with subject
+tranzia tls cert generate --key-type ecdsa --bits 384 --subject "/CN=internal.service/O=TranziaNet/C=US"
+
+# Generate ed25519 certificate
+tranzia tls cert generate --key-type ed25519 --subject "/CN=localhost/O=TranziaNet/C=US"
+`,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 
 		err := generateRequestTemplate(cmd, args)
@@ -226,19 +237,22 @@ func generateRequestTemplate(cmd *cobra.Command, _ []string) error {
 }
 
 func init() {
-	CertGenerate.Flags().IntVarP(&bits, "bits", "b", 2048, "Key size in bits")
-	CertGenerate.Flags().StringVar(&subject, "subject", "", "Subject for the certificate")
-	CertGenerate.Flags().StringVar(&keyType, "key-type", "rsa", "[ rsa | ecdsa | ed25519 ]")
-	CertGenerate.Flags().StringVar(&outCertFilePath, "cert-out", "", "provide path to store generated cert file")
-	CertGenerate.Flags().StringVar(&outPrivKeyFilePath, "private-key-out", "", "provide path to store generated private key file")
-	CertGenerate.Flags().StringVar(&outPubKeyFilePath, "public-key-out", "", "provide path to store generated public key file")
-	//CertGenerate.Flags().StringVar(&caCertFilePath, "ca-cert", "", "provide path of root/intermediate certificate")
-	//CertGenerate.Flags().StringVar(&caCertFilePath, "ca-key", "", "provide path of root/intermediate key")
-	CertGenerate.Flags().IntVar(&validity, "validity", 365, "Validity period of the certificate (e.g., 365d, 1y)")
-	//CertGenerate.Flags().StringVar(&sanEmail, "san-email", "", "SAN email address")
+	CertGenerate.Flags().IntVarP(&bits, "bits", "b", 2048, "Key size in bits (RSA: 2048/3072/4096, ECDSA: 256/384/521). Ignored for ed25519.")
+	CertGenerate.Flags().StringVar(&subject, "subject", "", "Subject in X.509 DN format, e.g., '/CN=example.com/L=City/O=Org/C=US'")
+	CertGenerate.Flags().StringVar(&keyType, "key-type", "rsa", "Type of private key to generate [rsa | ecdsa | ed25519]")
+
+	CertGenerate.Flags().StringVar(&outCertFilePath, "cert-out", "", "Path to save the generated certificate file")
+	CertGenerate.Flags().StringVar(&outPrivKeyFilePath, "private-key-out", "", "Path to save the generated private key file")
+	CertGenerate.Flags().StringVar(&outPubKeyFilePath, "public-key-out", "", "Path to save the generated public key file")
+
+	// CertGenerate.Flags().StringVar(&caCertFilePath, "ca-cert", "", "Path to the root or intermediate CA certificate")
+	// CertGenerate.Flags().StringVar(&caKeyFilePath, "ca-key", "", "Path to the root or intermediate CA private key")
+
+	CertGenerate.Flags().IntVar(&validity, "validity", 365, "Validity period of the certificate in days")
+	// CertGenerate.Flags().StringVar(&sanEmail, "san-email", "", "Subject Alternative Name (SAN) email address")
 	CertGenerate.Flags().StringVar(&usage, "usage", "", "Certificate usage (e.g., server auth, client auth)")
-	CertGenerate.Flags().BoolVar(&isCA, "is-ca", false, "is this a CA certificate?")
-	//CertGenerate.Flags().IntVar(&pathLength, "path-length", -1, "Path length for CA certificate")
+	CertGenerate.Flags().BoolVar(&isCA, "is-ca", false, "Mark certificate as a CA (Certificate Authority)")
+	// CertGenerate.Flags().IntVar(&pathLength, "path-length", -1, "Path length constraint for CA certificates")
 
 }
 
