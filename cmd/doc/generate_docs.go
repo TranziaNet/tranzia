@@ -26,6 +26,21 @@ func main() {
 
 	// Step 2: Generate index.md
 	generateIndex(outDir)
+
+	// Step 3: Sanity check to ensure docs were generated
+	if _, err := os.Stat(filepath.Join(outDir, "index.md")); err != nil {
+		log.Fatal("Docs not generated properly: index.md missing")
+	}
+
+	files, err := os.ReadDir(outDir)
+	if err != nil {
+		log.Fatal("Failed to read docs directory:", err)
+	}
+	if len(files) <= 1 {
+		log.Fatalf("Docs generation incomplete: only %d file(s) generated", len(files))
+	}
+
+	log.Printf("Docs generated successfully with %d files", len(files))
 }
 
 func generateIndex(docsDir string) {
