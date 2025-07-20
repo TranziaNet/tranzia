@@ -1,7 +1,7 @@
 package pkg
 
 var (
-	Version = "v1.0.0-alpha.1"
+	Version = "v0.0.0"
 	Commit  = "unknown"
 	Date    = "unknown"
 )
