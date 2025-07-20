@@ -4,7 +4,6 @@ IMAGE ?= tranzia
 TAG ?= dev
 
 .PHONY: all build clean
-
 all: build
 
 build:
@@ -16,3 +15,7 @@ docker-build-dev:
 
 clean:
 	rm -rf $(BIN_DIR)
+
+.PHONY: docs
+docs:
+	go run ./cmd/doc
