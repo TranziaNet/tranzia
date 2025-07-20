@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
 
+permissions:
+  id-token: write
+  pages: write
+  contents: read
+
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
