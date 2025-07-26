@@ -7,6 +7,7 @@ TAG ?= dev
 all: build
 
 build:
+	go mod tidy
 	go build -o $(BIN_DIR)/$(APP_NAME) ./cmd/main.go
 
 .PHONY: docker-build-dev
@@ -19,3 +20,8 @@ clean:
 .PHONY: docs
 docs:
 	go run ./cmd/doc
+
+.PHONY: test
+test:
+	@echo "Running all tests..."
+	@go test ./... -v $(if $(COVERAGE),-cover)

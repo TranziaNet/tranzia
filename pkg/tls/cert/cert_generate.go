@@ -20,44 +20,29 @@ import (
 )
 
 type CertGenerateOptions struct {
-	bits    int
-	subject *sub
-	keyType string
+	Bits    int
+	Subj    string
+	Subject *Sub
+	KeyType string
 	//caCertFilePath     string
 	//caKeyFilePath      string
-	outCertFilePath    string
-	outPrivKeyFilePath string
-	outPubKeyFilePath  string
-	validity           int
+	OutCertFilePath    string
+	OutPrivKeyFilePath string
+	OutPubKeyFilePath  string
+	Validity           int
 	//sanEmail           string
-	usage string
-	isCA  bool
+	Usage string
+	IsCA  bool
 	//pathLength         int
 }
-type sub struct {
-	c  []string
-	o  []string
-	ou []string
-	l  []string
-	cn string
-	st []string
+type Sub struct {
+	C  []string
+	O  []string
+	OU []string
+	L  []string
+	CN string
+	ST []string
 }
-
-var (
-	bits               int
-	subject            string
-	keyType            string
-	caCertFilePath     string
-	caKeyFilePath      string
-	outCertFilePath    string
-	outPrivKeyFilePath string
-	outPubKeyFilePath  string
-	validity           int
-	sanEmail           string
-	usage              string
-	isCA               bool
-	pathLength         int
-)
 
 type KeyType string
 
@@ -80,7 +65,7 @@ func (kt *KeyType) Set(val string) error {
 	return fmt.Errorf("key type not supported: %s", val)
 }
 
-var certGenerateOptions CertGenerateOptions
+var CertGenOpts CertGenerateOptions
 
 var CertGenerate = &cobra.Command{
 	Use:   "generate",
@@ -104,7 +89,7 @@ tranzia tls cert generate --key-type ed25519 --subject "/CN=localhost/O=TranziaN
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		err := handleCertGeneration(&certGenerateOptions)
+		err := handleCertGeneration(&CertGenOpts)
 		return err
 	},
 }
@@ -115,13 +100,13 @@ func generateRequestTemplate(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	certGenerateOptions.bits = bits
+	CertGenOpts.Bits = bits
 
-	subject, err := cmd.Flags().GetString("subject")
+	subject, err := cmd.Flags().GetString("subj")
 	if err != nil {
 		return err
 	}
-	s := &sub{}
+	s := &Sub{}
 
 	if strings.TrimSpace(subject) != "" {
 		re := regexp.MustCompile(`/([A-Z]{1,2})=([^/]+)`)
@@ -138,51 +123,51 @@ func generateRequestTemplate(cmd *cobra.Command, _ []string) error {
 
 			switch key {
 			case "C":
-				s.c = append(s.c, val)
+				s.C = append(s.C, val)
 			case "O":
-				s.o = append(s.o, val)
+				s.O = append(s.O, val)
 			case "OU":
-				s.ou = append(s.ou, val)
+				s.OU = append(s.OU, val)
 			case "L":
-				s.l = append(s.l, val)
+				s.L = append(s.L, val)
 			case "ST":
-				s.st = append(s.st, val)
+				s.ST = append(s.ST, val)
 			case "CN":
-				s.cn = val
+				s.CN = val
 			}
 		}
 
 	}
 
-	certGenerateOptions.subject = s
+	CertGenOpts.Subject = s
 
 	keyType, err := cmd.Flags().GetString("key-type")
 	if err != nil {
 		return err
 	}
 
-	certGenerateOptions.keyType = keyType
+	CertGenOpts.KeyType = keyType
 
 	outCertFilePath, err := cmd.Flags().GetString("cert-out")
 	if err != nil {
 		return err
 	}
 
-	certGenerateOptions.outCertFilePath = outCertFilePath
+	CertGenOpts.OutCertFilePath = outCertFilePath
 
 	outPrivKeyFilePath, err := cmd.Flags().GetString("private-key-out")
 	if err != nil {
 		return err
 	}
 
-	certGenerateOptions.outPrivKeyFilePath = outPrivKeyFilePath
+	CertGenOpts.OutPrivKeyFilePath = outPrivKeyFilePath
 
 	outPubKeyFilePath, err := cmd.Flags().GetString("public-key-out")
 	if err != nil {
 		return err
 	}
 
-	certGenerateOptions.outPubKeyFilePath = outPubKeyFilePath
+	CertGenOpts.OutPubKeyFilePath = outPubKeyFilePath
 
 	// caCertFilePath, err := cmd.Flags().GetString("ca-cert")
 	// if err != nil {
@@ -203,7 +188,7 @@ func generateRequestTemplate(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	certGenerateOptions.validity = validity
+	CertGenOpts.Validity = validity
 
 	// sanEmail, err := cmd.Flags().GetString("san-email")
 	// if err != nil {
@@ -217,14 +202,14 @@ func generateRequestTemplate(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	certGenerateOptions.usage = usage
+	CertGenOpts.Usage = usage
 
 	isCA, err := cmd.Flags().GetBool("is-ca")
 	if err != nil {
 		return err
 	}
 
-	certGenerateOptions.isCA = isCA
+	CertGenOpts.IsCA = isCA
 
 	// pathLength, err := cmd.Flags().GetInt("path-length")
 	// if err != nil {
@@ -237,33 +222,33 @@ func generateRequestTemplate(cmd *cobra.Command, _ []string) error {
 }
 
 func init() {
-	CertGenerate.Flags().IntVarP(&bits, "bits", "b", 2048, "Key size in bits (RSA: 2048/3072/4096, ECDSA: 256/384/521). Ignored for ed25519.")
-	CertGenerate.Flags().StringVar(&subject, "subject", "", "Subject in X.509 DN format, e.g., '/CN=example.com/L=City/O=Org/C=US'")
-	CertGenerate.Flags().StringVar(&keyType, "key-type", "rsa", "Type of private key to generate [rsa | ecdsa | ed25519]")
+	CertGenerate.Flags().IntVarP(&CertGenOpts.Bits, "bits", "b", 2048, "Key size in bits (RSA: 2048/3072/4096, ECDSA: 256/384/521). Ignored for ed25519.")
+	CertGenerate.Flags().StringVar(&CertGenOpts.Subj, "subj", "", "Subject in X.509 DN format, e.g., '/CN=example.com/L=City/O=Org/C=US'")
+	CertGenerate.Flags().StringVar(&CertGenOpts.KeyType, "key-type", "rsa", "Type of private key to generate [rsa | ecdsa | ed25519]")
 
-	CertGenerate.Flags().StringVar(&outCertFilePath, "cert-out", "", "Path to save the generated certificate file")
-	CertGenerate.Flags().StringVar(&outPrivKeyFilePath, "private-key-out", "", "Path to save the generated private key file")
-	CertGenerate.Flags().StringVar(&outPubKeyFilePath, "public-key-out", "", "Path to save the generated public key file")
+	CertGenerate.Flags().StringVar(&CertGenOpts.OutCertFilePath, "cert-out", "", "Path to save the generated certificate file")
+	CertGenerate.Flags().StringVar(&CertGenOpts.OutPrivKeyFilePath, "private-key-out", "", "Path to save the generated private key file")
+	CertGenerate.Flags().StringVar(&CertGenOpts.OutPubKeyFilePath, "public-key-out", "", "Path to save the generated public key file")
 
 	// CertGenerate.Flags().StringVar(&caCertFilePath, "ca-cert", "", "Path to the root or intermediate CA certificate")
 	// CertGenerate.Flags().StringVar(&caKeyFilePath, "ca-key", "", "Path to the root or intermediate CA private key")
 
-	CertGenerate.Flags().IntVar(&validity, "validity", 365, "Validity period of the certificate in days")
+	CertGenerate.Flags().IntVar(&CertGenOpts.Validity, "validity", 365, "Validity period of the certificate in days")
 	// CertGenerate.Flags().StringVar(&sanEmail, "san-email", "", "Subject Alternative Name (SAN) email address")
-	CertGenerate.Flags().StringVar(&usage, "usage", "", "Certificate usage (e.g., server auth, client auth)")
-	CertGenerate.Flags().BoolVar(&isCA, "is-ca", false, "Mark certificate as a CA (Certificate Authority)")
+	CertGenerate.Flags().StringVar(&CertGenOpts.Usage, "usage", "", "Certificate usage (e.g., server auth, client auth)")
+	CertGenerate.Flags().BoolVar(&CertGenOpts.IsCA, "is-ca", false, "Mark certificate as a CA (Certificate Authority)")
 	// CertGenerate.Flags().IntVar(&pathLength, "path-length", -1, "Path length constraint for CA certificates")
 
 }
 
 func handleCertGeneration(opts *CertGenerateOptions) error {
 
-	privateKey, err := generateKeyPair(opts)
+	privateKey, err := GenerateKeyPair(opts)
 	if err != nil {
 		return err
 	}
 
-	template, err := generateCertificateTemplate(opts)
+	template, err := GenerateCertificateTemplate(opts)
 	if err != nil {
 		return err
 	}
@@ -288,26 +273,26 @@ func handleCertGeneration(opts *CertGenerateOptions) error {
 
 	// print cert
 
-	generateOutput(privateKey, certDER, opts)
+	GenerateOutput(privateKey, certDER, opts)
 
 	return err
 }
 
-func generateKeyPair(opts *CertGenerateOptions) (privKey any, e error) {
+func GenerateKeyPair(opts *CertGenerateOptions) (privKey any, e error) {
 
 	var privateKey any
 	var err error
 
-	switch strings.ToLower(opts.keyType) {
+	switch strings.ToLower(opts.KeyType) {
 	case string(RSA):
-		privateKey, err = rsa.GenerateKey(rand.Reader, opts.bits)
+		privateKey, err = rsa.GenerateKey(rand.Reader, opts.Bits)
 		if err != nil {
 			return nil, err
 		}
 
 	case string(ECDSA):
 		var curve elliptic.Curve
-		switch bits {
+		switch CertGenOpts.Bits {
 		case 256:
 			curve = elliptic.P256()
 		case 384:
@@ -329,20 +314,20 @@ func generateKeyPair(opts *CertGenerateOptions) (privKey any, e error) {
 		}
 
 	default:
-		return nil, fmt.Errorf("unsupported key type %s", opts.keyType)
+		return nil, fmt.Errorf("unsupported key type %s", opts.KeyType)
 	}
 
 	return privateKey, nil
 }
 
-func generateCertificateTemplate(opts *CertGenerateOptions) (*x509.Certificate, error) {
+func GenerateCertificateTemplate(opts *CertGenerateOptions) (*x509.Certificate, error) {
 
 	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 	if err != nil {
 		return nil, err
 	}
 
-	usage, err := ParseKeyUsageStrict(opts.usage)
+	usage, err := ParseKeyUsageStrict(opts.Usage)
 	if err != nil {
 		return nil, err
 	}
@@ -350,18 +335,18 @@ func generateCertificateTemplate(opts *CertGenerateOptions) (*x509.Certificate, 
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			CommonName:         opts.subject.cn,
-			Country:            opts.subject.c,
-			Organization:       opts.subject.o,
-			OrganizationalUnit: opts.subject.ou,
-			Locality:           opts.subject.l,
-			Province:           opts.subject.st,
+			CommonName:         opts.Subject.CN,
+			Country:            opts.Subject.C,
+			Organization:       opts.Subject.O,
+			OrganizationalUnit: opts.Subject.OU,
+			Locality:           opts.Subject.L,
+			Province:           opts.Subject.ST,
 		},
 		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(time.Duration(opts.validity) * 24 * time.Hour),
+		NotAfter:              time.Now().Add(time.Duration(opts.Validity) * 24 * time.Hour),
 		KeyUsage:              usage,
 		BasicConstraintsValid: true,
-		IsCA:                  opts.isCA,
+		IsCA:                  opts.IsCA,
 		// MaxPathLen:            opts.pathLength,
 	}
 
@@ -369,7 +354,7 @@ func generateCertificateTemplate(opts *CertGenerateOptions) (*x509.Certificate, 
 
 }
 
-func generateOutput(privateKey any, cert []byte, opts *CertGenerateOptions) error {
+func GenerateOutput(privateKey any, cert []byte, opts *CertGenerateOptions) error {
 
 	// print generated cert to stdout
 	err := pem.Encode(os.Stdout, &pem.Block{
@@ -430,8 +415,8 @@ func generateOutput(privateKey any, cert []byte, opts *CertGenerateOptions) erro
 	fmt.Printf("%s", pemEncodedPrivateKey)
 
 	// write data to files
-	if opts.outCertFilePath != "" {
-		file, err := os.Create(outCertFilePath)
+	if opts.OutCertFilePath != "" {
+		file, err := os.Create(opts.OutCertFilePath)
 		if err != nil {
 			panic(err)
 		}
@@ -444,15 +429,15 @@ func generateOutput(privateKey any, cert []byte, opts *CertGenerateOptions) erro
 
 	}
 
-	if opts.outPrivKeyFilePath != "" {
-		err := os.WriteFile(opts.outPrivKeyFilePath, pemEncodedPrivateKey, 0644)
+	if opts.OutPrivKeyFilePath != "" {
+		err := os.WriteFile(opts.OutPrivKeyFilePath, pemEncodedPrivateKey, 0644)
 		if err != nil {
 			panic(fmt.Errorf("failed to write private key file: %w", err))
 		}
 	}
 
-	if opts.outPubKeyFilePath != "" {
-		err := os.WriteFile(opts.outPubKeyFilePath, pemEncodedPublicKey, 0644)
+	if opts.OutPubKeyFilePath != "" {
+		err := os.WriteFile(opts.OutPubKeyFilePath, pemEncodedPublicKey, 0644)
 		if err != nil {
 			panic(fmt.Errorf("failed to write public key file: %w", err))
 		}
