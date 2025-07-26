@@ -9,109 +9,60 @@ import (
 	"strings"
 
 	"github.com/TranziaNet/tranzia/pkg/cmd"
+	_ "github.com/TranziaNet/tranzia/pkg/tls"
+	_ "github.com/TranziaNet/tranzia/pkg/tls/cert"
+
 	"github.com/spf13/cobra/doc"
 )
 
 func main() {
 	outDir := "./docs"
 	if err := os.MkdirAll(outDir, 0755); err != nil {
-		log.Fatal(err)
+		log.Fatalf("❌ Failed to create output directory: %v", err)
 	}
 
-	// Step 1: Generate CLI docs
-	err := doc.GenMarkdownTree(cmd.RootCmd, outDir)
-	if err != nil {
-		log.Fatalf("Failed to generate CLI docs: %v", err)
-	}
-
-	// Step 2: Generate index.md
-	generateIndex(outDir)
-
-	// Step 3: Sanity check to ensure docs were generated
-	if _, err := os.Stat(filepath.Join(outDir, "index.md")); err != nil {
-		log.Fatal("Docs not generated properly: index.md missing")
+	log.Printf("📘 Generating CLI docs to %s", outDir)
+	if err := doc.GenMarkdownTree(cmd.RootCmd, outDir); err != nil {
+		log.Fatalf("❌ Failed to generate CLI docs: %v", err)
 	}
 
 	files, err := os.ReadDir(outDir)
 	if err != nil {
-		log.Fatal("Failed to read docs directory:", err)
+		log.Fatalf("❌ Failed to read docs directory: %v", err)
 	}
-	if len(files) <= 1 {
-		log.Fatalf("Docs generation incomplete: only %d file(s) generated", len(files))
+	mdFiles := filterMarkdownFiles(files)
+	if len(mdFiles) == 0 {
+		log.Fatal("❌ No CLI Markdown files generated. Are subcommands registered?")
 	}
 
-	log.Printf("Docs generated successfully with %d files", len(files))
+	generateSimpleIndex(outDir, mdFiles)
+
+	log.Printf("✅ CLI docs generated: %d files", len(mdFiles)+1) // +1 for index.md
 }
 
-func generateIndex(docsDir string) {
-	files, err := os.ReadDir(docsDir)
-	if err != nil {
-		log.Fatal(err)
+func filterMarkdownFiles(files []os.DirEntry) []os.DirEntry {
+	var md []os.DirEntry
+	for _, f := range files {
+		if !f.IsDir() && strings.HasSuffix(f.Name(), ".md") && f.Name() != "index.md" {
+			md = append(md, f)
+		}
 	}
+	return md
+}
 
-	var links []string
+func generateSimpleIndex(outDir string, files []os.DirEntry) {
+	var lines []string
 	for _, f := range files {
 		name := f.Name()
-		if f.IsDir() || name == "index.md" || !strings.HasSuffix(name, ".md") {
-			continue
-		}
 		title := strings.TrimSuffix(name, ".md")
-		links = append(links, fmt.Sprintf("- [%s](%s)", title, name))
+		lines = append(lines, fmt.Sprintf("- [%s](%s)", title, name))
 	}
+	sort.Strings(lines)
 
-	sort.Strings(links)
+	index := "# CLI Command Reference\n\n" + strings.Join(lines, "\n") + "\n"
 
-	indexTemplate := `# Tranzia CLI Documentation
-
-Welcome to the **Tranzia** CLI documentation!  
-Tranzia is a modern, unified CLI toolkit for developers, DevOps, and SREs, combining networking tools like ` + "`curl`" + `, ` + "`nc`" + `, ` + "`openssl`" + `, and ` + "`tcpdump`" + ` under one interface.
-
----
-
-## 📚 Available Commands
-
-` + strings.Join(links, "\n") + `
-
----
-
-## 📝 How to Use Tranzia
-
-- To view available commands:
-
-` + "```bash\ntranzia --help\n```" + `
-
-- To get help for any command:
-
-` + "```bash\ntranzia <command> --help\n```" + `
-
-Examples:
-
-- Basic TCP client:
-
-` + "```bash\ntranzia tcp client --host example.com --port 9000\n```" + `
-
-- Generate TLS certificate:
-
-` + "```bash\ntranzia tls cert generate --key-type rsa --subject \"/CN=example.com/O=Org\"\n```" + `
-
----
-
-## 💡 Resources
-- [GitHub Repository](https://github.com/TranziaNet/tranzia)
-- [Releases](https://github.com/TranziaNet/tranzia/releases)
-- [Report Issues](https://github.com/TranziaNet/tranzia/issues)
-
----
-
-_Auto-generated using Cobra CLI tools._
-`
-
-	finalContent := strings.Replace(indexTemplate, "{{generated_links}}", strings.Join(links, "\n"), 1)
-
-	err = os.WriteFile(filepath.Join(docsDir, "index.md"), []byte(finalContent), 0644)
-	if err != nil {
-		log.Fatal(err)
+	if err := os.WriteFile(filepath.Join(outDir, "index.md"), []byte(index), 0644); err != nil {
+		log.Fatalf("❌ Failed to write index.md: %v", err)
 	}
-
-	log.Printf("✅ index.md generated with %d entries", len(links))
+	log.Printf("📄 index.md generated with %d entries", len(lines))
 }
