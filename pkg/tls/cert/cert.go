@@ -14,4 +14,5 @@ tranzia tls cert generate --subject "/CN=example.com"
 
 func init() {
 	CertCommand.AddCommand(CertGenerate)
+	CertCommand.AddCommand(CertInspect)
 }
